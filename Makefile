@@ -14,8 +14,8 @@ virtualenv:
 
 test:
 	python -m pytest \
-		-v \
+		-vv \
 		--ignore=env \
 		--cov=confdict \
-		--cov-report=term \
+		--cov-report=term-missing \
 		tests/
