@@ -9,7 +9,9 @@ import re
 
 
 class RecursiveDict(MutableMapping):
+  """A dictionary that allows recursive and relative access to its contents."""
   def __init__(self, *args, **kwargs):
+    # keys and chars used for various functionalities
     self.separator = kwargs.pop('__separator', '/')
     self.self_key = kwargs.pop('__self_key', '.')
     self.parent_key = kwargs.pop('__parent_key', '..')
@@ -19,15 +21,23 @@ class RecursiveDict(MutableMapping):
       self.self_key, self.parent_key, self.root_key, self.key_key
     ]
 
+    # recursive structure
     self.root = kwargs.pop('__root', None)
     self.parent = kwargs.pop('__parent', None)
     self.key = kwargs.pop('__key', None)
     if self.parent is None:
       self.root = self
+
+    # underlying storage
     self.store = dict()
     self.update(dict(*args, **kwargs))
 
   def key_to_path(self, key):
+    """
+    Function that transforms key to list of keys aka path.
+    By default, separates key using `separator` if it is string.
+    Must return `list`, cannot assume type of `key`.
+    """
     if isinstance(key, str) and self.separator in key:
       return key.split(self.separator)
     elif isinstance(key, list):
@@ -36,10 +46,19 @@ class RecursiveDict(MutableMapping):
       return [ key ]
 
   def path_to_key(self, path):
+    """
+    Function that will transform a path into single key.
+    By default, it will join all elements using `separator`.
+    Type of path is guaranteed to be a `list`.
+    """
     assert type(path) == list
     return self.separator.join(path)
 
   def __getitem__(self, key):
+    """
+    Transforms key to path and tries to recursively descent into dict.
+    It will also handle relative keys, eg `..` and `...`.
+    """
     path = self.key_to_path(copy(key))
     if len(path) == 1:
       current_key = path.pop(0)
@@ -61,7 +80,12 @@ class RecursiveDict(MutableMapping):
     if len(path) == 1:
       if isinstance(value, Mapping):
         current_key = path.pop(0)
-        self.store[current_key] = self.__class__(__root=self.root,
+        self.store[current_key] = self.__class__(__separator=self.separator,
+                                                 __self_key=self.self_key,
+                                                 __parent_key=self.parent_key,
+                                                 __root_key=self.root_key,
+                                                 __key_key=self.key_key,
+                                                 __root=self.root,
                                                  __parent=self,
                                                  __key=current_key,
                                                  **value)
@@ -89,10 +113,7 @@ class RecursiveDict(MutableMapping):
       value = self.store[key]
       if isinstance(value, Mapping):
         for inner_key in value:
-          if isinstance(inner_key, list):
-            yield self.path_to_key([ key ] + inner_key)
-          else:
-            yield self.path_to_key([ key, inner_key ])
+          yield self.path_to_key([ key, inner_key ])
       else:
         yield self.path_to_key([ key ])
 
@@ -106,6 +127,9 @@ class RecursiveDict(MutableMapping):
     return self.__unicode__()
 
   def update(self, d):
+    """
+    Default update method of this dictionary is a deep update.
+    """
     for k, v in d.items():
       path = self.key_to_path(copy(k))
       if isinstance(v, Mapping) and k in self:
@@ -125,6 +149,11 @@ class RecursiveDict(MutableMapping):
 
 
 class InterpolatedDict(RecursiveDict):
+  """
+  Enables self referential values on top of RecursiveDict.
+  By default, it will try to evaluate values containing double curly braces.
+  It will also evaluate "<key>" to key of current dictionary level.
+  """
   def __init__(self, *args, **kwargs):
     self.interpolation_regex = re.compile(kwargs.pop('__interpolation_regex', r'{{([^{}]*)}}'))
     super(InterpolatedDict, self).__init__(*args, **kwargs)
@@ -137,6 +166,9 @@ class InterpolatedDict(RecursiveDict):
       return value
 
   def interpolate_value(self, value):
+    if self.key == 'fallback':
+      return value
+
     blocks = self.interpolation_regex.findall(value)
     interpolated_value = value
     for block in blocks:
@@ -147,12 +179,21 @@ class InterpolatedDict(RecursiveDict):
 
 
 class ConfDict(InterpolatedDict):
+  """
+  Adds fallback functionality on top of InterpolatedDict. If current level does
+  not contain the key and contains a fallback, this dict will fall back to that
+  dictionary with remaining path. If this level does not contain a fallback it
+  will try to fallback to parents fallback until it reaches root level.
+  """
   def __init__(self, *args, **kwargs):
     self.fallback = kwargs.pop('fallback', None)
     super(ConfDict, self).__init__(*args, **kwargs)
 
     if self.fallback:
-      self.fallback = ConfDict(__root=self.root, __parent=self, __key='fallback', **self.fallback)
+      self.fallback = ConfDict(__root=self.root,
+                               __parent=self,
+                               __key='fallback',
+                               **self.fallback)
 
     self.fallback_enabled = True
 
