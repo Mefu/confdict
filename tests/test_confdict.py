@@ -38,12 +38,14 @@ def test_confdict(capsys):
             'k6122': 'v6122f',
           },
           'k613': '{{<key>}}',
+          'k614': '{{k613}}',
         },
         'k61': {
           'k611': 'v611',
           'k612': {
             'k6121': 'v6121',
           },
+          'k613': 'v613',
         },
       },
     )
@@ -72,9 +74,12 @@ def test_confdict(capsys):
     assert cd['k6/k61/k611'] == 'v611'
     assert cd['k6/k61/k612/k6121'] == 'v6121'
     assert cd['k6/k61/k612/k6122'] == 'v6122f'
+    assert cd['k6/k61/k613'] == 'v613'
 
     # fallback and interpolation
     assert cd['k6/k62/k613'] == 'k62'
+    assert cd['k6/k62/k614'] == 'k62'
+    assert cd['k6/k61/k614'] == 'v613'
 
     # update
     cd.update({
@@ -190,11 +195,13 @@ def test_confdict(capsys):
             'k6122': 'v6122f_2',
           },
           'k613': '{{<key>}}',
+          'k614': '{{k613}}',
         },
         'k61': {
           'k611': 'v611',
           'k612': {
           },
+          'k613': 'v613',
         },
       },
       'k7': {
