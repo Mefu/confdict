@@ -2,6 +2,7 @@
 from collections.abc import Mapping, MutableMapping
 from copy import copy
 import re
+import traceback
 
 # third party libs
 
@@ -111,6 +112,7 @@ class RecursiveDict(MutableMapping):
     if len(path) == 1:
       current_key = path[0]
       current_key = self.key_before_get(current_key)
+
       if current_key == self.config['self_key']:
         return self
       elif current_key == self.config['parent_key']:
@@ -124,12 +126,17 @@ class RecursiveDict(MutableMapping):
         return self.key
       else:
         try:
-          value = self.store[current_key]
+          return self.store[current_key]
         except KeyError as e:
-          value = self.key_not_found(current_key, e)
+          # for key in self.store:
+          #   key_regex = re.compile(key)
+          #   if key_regex.match(current_key):
+          #     return self.store[key]
 
-        value = self.value_after_get(value)
-        return value
+          print("Current full path: " + str(self.full_path))
+          print("Current path: " + str(path))
+          print("Current key: " + str(current_key))
+          return self.key_not_found(current_key, e)
     else:
       return self.get(path[:1]).get(path[1:])
 
@@ -141,7 +148,8 @@ class RecursiveDict(MutableMapping):
     path = self.key_to_path(copy(key))
     path = self.path_before_get(path)
     try:
-      return self.get(path)
+      value = self.get(path)
+      return self.value_after_get(value)
     except KeyError as e:
       return self.path_not_found(path, e)
 
@@ -259,8 +267,13 @@ class InterpolatedDict(RecursiveDict):
     blocks = self.config['interpolation_regex'].findall(value)
     interpolated_value = value
     for block in blocks:
-      full_block_key = self.full_key + self.config['separator'] + block
+      print("Interpolating: " + block + " in " + str(self.full_key))
+      print(self.store.keys())
+      full_block_key = block
+      if self.full_key:
+        full_block_key = self.full_key + self.config['separator'] + block
       if isinstance(self.root[full_block_key], str):
+        print(full_block_key)
         interpolated_value = interpolated_value.replace('{{' + block + '}}', self.root[full_block_key])
       else:
         raise KeyError(block)
@@ -274,76 +287,76 @@ class ConfDict(InterpolatedDict):
   dictionary with remaining path. If this level does not contain a fallback it
   will try to fallback to parents fallback until it reaches root level.
   """
-  def __init__(self, *args, **kwargs):
-    self.fallback = kwargs.pop('fallback', None)
-    is_fallback = kwargs.pop('__is_fallback', None)
-    super(ConfDict, self).__init__(*args, **kwargs)
+  # def __init__(self, *args, **kwargs):
+  #   self.fallback = kwargs.pop('fallback', None)
+  #   is_fallback = kwargs.pop('__is_fallback', None)
+  #   super(ConfDict, self).__init__(*args, **kwargs)
 
-    if self.fallback:
-      self.fallback = ConfDict(__root=self.root,
-                               __parent=self,
-                               __key='fallback',
-                               __is_fallback=True,
-                               __config=self.config,
-                               **self.fallback)
+  #   if self.fallback:
+  #     self.fallback = ConfDict(__root=self.root,
+  #                              __parent=self,
+  #                              __key='fallback',
+  #                              __is_fallback=True,
+  #                              __config=self.config,
+  #                              **self.fallback)
 
-    if is_fallback is not None:
-      self.config['is_fallback'] = is_fallback
-    elif 'is_fallback' not in self.config:
-      self.config['is_fallback'] = False
+  #   if is_fallback is not None:
+  #     self.config['is_fallback'] = is_fallback
+  #   elif 'is_fallback' not in self.config:
+  #     self.config['is_fallback'] = False
 
-  def key_not_found(self, key, error):
-    if key.startswith('fallback') and self.fallback:
-      if self.config['separator'] in key:
-        self.fallback.key = key.split(self.config['separator'])[1]
-      else:
-        self.fallback.key = 'fallback'
-      return self.fallback
+  # def key_not_found(self, key, error):
+  #   if key.startswith('fallback') and self.fallback:
+  #     if self.config['separator'] in key:
+  #       self.fallback.key = key.split(self.config['separator'])[1]
+  #     else:
+  #       self.fallback.key = 'fallback'
+  #     return self.fallback
 
-    return super(ConfDict, self).key_not_found(key, error)
+  #   return super(ConfDict, self).key_not_found(key, error)
 
-  def path_not_found(self, path, error):
-    fallback_paths = []
+  # def path_not_found(self, path, error):
+  #   fallback_paths = []
 
-    for idx in range(0, len(path)):
-      fallback_path = copy(path)
-      fallback_path[idx] = self.config['separator'].join([ 'fallback', fallback_path[idx] ])
-      fallback_paths.append(fallback_path)
+  #   for idx in range(0, len(path)):
+  #     fallback_path = copy(path)
+  #     fallback_path[idx] = self.config['separator'].join([ 'fallback', fallback_path[idx] ])
+  #     fallback_paths.append(fallback_path)
 
-    fallback_paths.reverse()
+  #   fallback_paths.reverse()
 
-    for fallback_path in fallback_paths:
-      try:
-        return self.root.get(fallback_path)
-      except KeyError as e:
-        pass
+  #   for fallback_path in fallback_paths:
+  #     try:
+  #       return self.root.get(fallback_path)
+  #     except KeyError as e:
+  #       pass
 
-    return super(ConfDict, self).path_not_found(path, error)
+  #   return super(ConfDict, self).path_not_found(path, error)
 
-  def value_after_get(self, value):
-    # do not interpolate if accessed directly as fallback
-    if self.config['is_fallback'] and self.key == 'fallback':
-      return value
-    else:
-      return super(ConfDict, self).value_after_get(value)
+  # def value_after_get(self, value):
+  #   # do not interpolate if accessed directly as fallback
+  #   if self.config['is_fallback'] and self.key == 'fallback':
+  #     return value
+  #   else:
+  #     return super(ConfDict, self).value_after_get(value)
 
-  def update(self, d):
-    dcopy = copy(d)
-    if 'fallback' in dcopy:
-      if self.fallback:
-        self.fallback.update(dcopy.pop('fallback'))
-      else:
-        self.fallback = ConfDict(__root=self.root,
-                                 __parent=self,
-                                 __key='fallback',
-                                 __is_fallback=True,
-                                 **dcopy.pop('fallback'))
-    super(ConfDict, self).update(dcopy)
+  # def update(self, d):
+  #   dcopy = copy(d)
+  #   if 'fallback' in dcopy:
+  #     if self.fallback:
+  #       self.fallback.update(dcopy.pop('fallback'))
+  #     else:
+  #       self.fallback = ConfDict(__root=self.root,
+  #                                __parent=self,
+  #                                __key='fallback',
+  #                                __is_fallback=True,
+  #                                **dcopy.pop('fallback'))
+  #   super(ConfDict, self).update(dcopy)
 
-  def to_dict(self):
-    d = super(ConfDict, self).to_dict()
-    if self.fallback:
-      self.fallback.key = 'fallback'
-      d['fallback'] = self.fallback.to_dict()
-    return d
+  # def to_dict(self):
+  #   d = super(ConfDict, self).to_dict()
+  #   if self.fallback:
+  #     self.fallback.key = 'fallback'
+  #     d['fallback'] = self.fallback.to_dict()
+  #   return d
 

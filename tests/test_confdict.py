@@ -40,7 +40,7 @@ def test_confdict(capsys):
         'k53': 'v53',
       },
       k6 = {
-        'fallback': {
+        '.*': {
           'k611': 'v611f',
           'k612': {
             'k6121': 'v6121f',
