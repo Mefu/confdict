@@ -8,6 +8,15 @@ from confdict import ConfDict
 
 def test_confdict(capsys):
   with capsys.disabled():
+    test_config = {
+      '__separator': '/',
+      '__self_key': '.',
+      '__parent_key': '..',
+      '__root_key': '...',
+      '__key_key': '<key>',
+      '__interpolation_regex': r'{{([^{}]*)}}',
+    }
+
     cd = ConfDict(
       k1 = 'v1',
       k2 = {
@@ -48,6 +57,7 @@ def test_confdict(capsys):
           'k613': 'v613',
         },
       },
+      **test_config
     )
 
     # standard access
@@ -62,7 +72,8 @@ def test_confdict(capsys):
     assert cd['k2/..'] == cd
     assert cd['k2/k22/...'] == cd
     assert cd['k2/k22/../k21'] == cd['k2/k21']
-
+    assert cd['k2/../../../k2'] == cd['k2']
+    assert cd['k2/<key>'] == 'k2'
 
     # interpolation
     assert cd['k5/k51'] == 'v32'
@@ -80,6 +91,14 @@ def test_confdict(capsys):
     assert cd['k6/k62/k613'] == 'k62'
     assert cd['k6/k62/k614'] == 'k62'
     assert cd['k6/k61/k614'] == 'v613'
+
+    # contains
+    assert 'k2' in cd
+    assert 'k2/k22' in cd
+    assert 'k2/k22/..' in cd
+    assert '<key>' in cd
+    # fallbacks should not be considered as contained
+    assert not 'k6/k61/k612/k6122' in cd
 
     # update
     cd.update({

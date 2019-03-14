@@ -34,15 +34,18 @@ class RecursiveDict(MutableMapping):
 
     # from kwargs
     if '__separator' in kwargs:
-      self.config['separator'] = kwargs['__separator']
+      self.config['separator'] = kwargs.pop('__separator')
     if '__self_key' in kwargs:
-      self.config['self_key'] = kwargs['__self_key']
+      self.config['self_key'] = kwargs.pop('__self_key')
     if '__parent_key' in kwargs:
-      self.config['parent_key'] = kwargs['__parent_key']
+      self.config['parent_key'] = kwargs.pop('__parent_key')
     if '__root_key' in kwargs:
-      self.config['root_key'] = kwargs['__root_key']
+      self.config['root_key'] = kwargs.pop('__root_key')
     if '__key_key' in kwargs:
-      self.config['key_key'] = kwargs['__key_key']
+      self.config['key_key'] = kwargs.pop('__key_key')
+
+    if '__config' in kwargs:
+      self.config = kwargs.pop('__config')
 
     self.builtin_keys = [
       self.config['self_key'],
@@ -74,8 +77,9 @@ class RecursiveDict(MutableMapping):
     """
     if isinstance(key, str) and self.config['separator'] in key:
       return key.split(self.config['separator'])
-    elif isinstance(key, list):
-      return key
+    # this is not getting hit with tests, so I removed it
+    # elif isinstance(key, list):
+    #   return key
     else:
       return [ key ]
 
@@ -158,6 +162,7 @@ class RecursiveDict(MutableMapping):
         self.store[current_key] = self.__class__(__root=self.root,
                                                  __parent=self,
                                                  __key=current_key,
+                                                 __config=self.config,
                                                  **value)
       else:
         value = self.value_before_set(value)
@@ -255,11 +260,10 @@ class InterpolatedDict(RecursiveDict):
     interpolated_value = value
     for block in blocks:
       full_block_key = self.full_key + self.config['separator'] + block
-      print(full_block_key)
-      print(self.root[full_block_key])
-      interpolated_value = interpolated_value.replace('{{' + block + '}}', self.root[full_block_key])
-      if self.config['interpolation_regex'].findall(interpolated_value):
-        interpolated_value = self.interpolate_value(interpolated_value)
+      if isinstance(self.root[full_block_key], str):
+        interpolated_value = interpolated_value.replace('{{' + block + '}}', self.root[full_block_key])
+      else:
+        raise KeyError(block)
 
     return interpolated_value
 
@@ -280,6 +284,7 @@ class ConfDict(InterpolatedDict):
                                __parent=self,
                                __key='fallback',
                                __is_fallback=True,
+                               __config=self.config,
                                **self.fallback)
 
     if is_fallback is not None:
