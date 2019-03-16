@@ -8,7 +8,6 @@ import traceback
 
 # project imports
 
-
 class RecursiveDict(MutableMapping):
   """A dictionary that allows recursive and relative access to its contents."""
   def __init__(self, *args, **kwargs):
@@ -126,17 +125,17 @@ class RecursiveDict(MutableMapping):
         return self.key
       else:
         try:
-          return self.store[current_key]
+          return self.value_after_get(self.store[current_key])
         except KeyError as e:
-          # for key in self.store:
-          #   key_regex = re.compile(key)
-          #   if key_regex.match(current_key):
-          #     return self.store[key]
+          for key in self.store:
+            key_regex = re.compile(key)
+            if key_regex.match(current_key):
+              return self.value_after_get(self.store[key])
 
           print("Current full path: " + str(self.full_path))
           print("Current path: " + str(path))
           print("Current key: " + str(current_key))
-          return self.key_not_found(current_key, e)
+          return self.value_after_get(self.key_not_found(current_key, e))
     else:
       return self.get(path[:1]).get(path[1:])
 
@@ -145,11 +144,11 @@ class RecursiveDict(MutableMapping):
     Transforms key to path and tries to recursively descent into dict.
     It will also handle relative keys, eg `..` and `...`.
     """
+    print("Accessing: " + key + " in " + str(self.store.keys()))
     path = self.key_to_path(copy(key))
     path = self.path_before_get(path)
     try:
-      value = self.get(path)
-      return self.value_after_get(value)
+      return self.get(path)
     except KeyError as e:
       return self.path_not_found(path, e)
 
@@ -268,13 +267,13 @@ class InterpolatedDict(RecursiveDict):
     interpolated_value = value
     for block in blocks:
       print("Interpolating: " + block + " in " + str(self.full_key))
-      print(self.store.keys())
       full_block_key = block
       if self.full_key:
         full_block_key = self.full_key + self.config['separator'] + block
       if isinstance(self.root[full_block_key], str):
         print(full_block_key)
-        interpolated_value = interpolated_value.replace('{{' + block + '}}', self.root[full_block_key])
+        interpolated_value = interpolated_value.replace('{{' + block + '}}',
+                                                        self.root[full_block_key])
       else:
         raise KeyError(block)
 

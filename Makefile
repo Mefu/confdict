@@ -5,6 +5,8 @@ clean:
 	find . -name "__pycache__" -type d -empty -delete
 	find . -name ".pytest_cache" -type d -exec rm -rv {} +
 	find . -name "pip-wheel-metadata" -type d -exec rm -rv {} +
+	find . -name "*.egg-info" -type d -exec rm -rv {} +
+	find . -name "env" -type d -exec rm -rv {} +
 
 virtualenv: SHELL:=/bin/bash
 virtualenv:
