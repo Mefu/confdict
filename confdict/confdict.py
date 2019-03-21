@@ -11,13 +11,6 @@ import traceback
 class RecursiveDict(MutableMapping):
   """A dictionary that allows recursive and relative access to its contents."""
   def __init__(self, *args, **kwargs):
-    # recursive structure
-    self.root = kwargs.pop('__root', None)
-    self.parent = kwargs.pop('__parent', None)
-    self.key = kwargs.pop('__key', None)
-    if self.parent is None:
-      self.root = self
-
     # keys and chars used for various functionalities
     # defaults
     self.config = {
@@ -27,10 +20,6 @@ class RecursiveDict(MutableMapping):
       'root_key': '...',
       'key_key': '<key>',
     }
-
-    # from parent
-    if self.parent:
-      self.config.update(self.parent.config)
 
     # from kwargs
     if '__separator' in kwargs:
@@ -54,20 +43,30 @@ class RecursiveDict(MutableMapping):
       self.config['key_key'],
     ]
 
+    self.current_path = kwargs.pop('__current_path', [])
+
     # underlying storage
     self.store = dict()
-    self.update(dict(*args, **kwargs))
+    self.store.update(dict(*args, **kwargs))
 
   @property
-  def full_path(self):
-    if self.parent is None:
-      return []
-    else:
-      return self.parent.full_path + [ self.key ]
+  def current(self):
+    current = self.store
+    for part in self.current_path:
+      current = current[part]
+    return current
 
-  @property
-  def full_key(self):
-    return self.path_to_key(self.full_path)
+  def relative(self, path, onError = False):
+    current = self.current
+    for idx, part in enumerate(path):
+      try:
+        current = current[part]
+      except KeyError as e:
+        if onError:
+          current = onError(current, part, self.current_path + path[:idx], e)
+        else:
+          raise e
+    return current
 
   def key_to_path(self, key):
     """
@@ -78,8 +77,8 @@ class RecursiveDict(MutableMapping):
     if isinstance(key, str) and self.config['separator'] in key:
       return key.split(self.config['separator'])
     # this is not getting hit with tests, so I removed it
-    # elif isinstance(key, list):
-    #   return key
+    elif isinstance(key, list):
+      return key
     else:
       return [ key ]
 
@@ -98,53 +97,44 @@ class RecursiveDict(MutableMapping):
   def path_not_found(self, path, error):
     raise error
 
-  def key_before_get(self, key):
-    return key
-
   def path_before_get(self, path):
-    return path
+    new_path = []
+    for idx, part in enumerate(path):
+      if part == self.config['self_key']:
+        continue
+      elif part == self.config['parent_key']:
+        new_path = new_path[:-1]
+      elif part == self.config['root_key']:
+        new_path = []
+      else:
+        new_path.append(part)
+    return new_path
 
   def value_after_get(self, value):
     return value
 
   def get(self, path):
-    if len(path) == 1:
-      current_key = path[0]
-      current_key = self.key_before_get(current_key)
-
-      if current_key == self.config['self_key']:
-        return self
-      elif current_key == self.config['parent_key']:
-        if self.parent:
-          return self.parent
-        else:
-          return self
-      elif current_key == self.config['root_key']:
-        return self.root
-      elif current_key == self.config['key_key']:
-        return self.key
+    def onError(current, part, path_until, error):
+      if part == self.config['key_key']:
+        return path_until[-1]
       else:
-        try:
-          return self.value_after_get(self.store[current_key])
-        except KeyError as e:
-          for key in self.store:
-            key_regex = re.compile(key)
-            if key_regex.match(current_key):
-              return self.value_after_get(self.store[key])
+        self.key_not_found(part, error)
 
-          print("Current full path: " + str(self.full_path))
-          print("Current path: " + str(path))
-          print("Current key: " + str(current_key))
-          return self.value_after_get(self.key_not_found(current_key, e))
-    else:
-      return self.get(path[:1]).get(path[1:])
+    current = self.relative(path, onError)
+
+    if isinstance(current, Mapping):
+      return self.__class__(__current_path=self.current_path + path,
+                            __config=self.config,
+                            **self.store)
+
+    return self.value_after_get(current)
+
 
   def __getitem__(self, key):
     """
     Transforms key to path and tries to recursively descent into dict.
     It will also handle relative keys, eg `..` and `...`.
     """
-    print("Accessing: " + key + " in " + str(self.store.keys()))
     path = self.key_to_path(copy(key))
     path = self.path_before_get(path)
     try:
@@ -162,20 +152,11 @@ class RecursiveDict(MutableMapping):
     return value
 
   def set(self, path, value):
-    if len(path) == 1:
-      current_key = path[0]
-      current_key = self.key_before_set(current_key)
-      if isinstance(value, Mapping):
-        self.store[current_key] = self.__class__(__root=self.root,
-                                                 __parent=self,
-                                                 __key=current_key,
-                                                 __config=self.config,
-                                                 **value)
-      else:
-        value = self.value_before_set(value)
-        self.store[current_key] = value
-    else:
-      self.get(path[:1]).set(path[1:], value)
+    def onError(current, part, path_until, e):
+      return {}
+
+    current = self.relative(path[:-1], onError)
+    current[path[-1]] = value
 
   def __setitem__(self, key, value):
     path = self.key_to_path(copy(key))
@@ -183,8 +164,8 @@ class RecursiveDict(MutableMapping):
     self.set(path, value)
 
   def __iter__(self):
-    for key in self.store:
-      value = self.store[key]
+    for key in self.current:
+      value = self.current[key]
       if isinstance(value, Mapping):
         for inner_key in value:
           yield self.path_to_key([ key, inner_key ])
@@ -233,8 +214,8 @@ class RecursiveDict(MutableMapping):
 
   def to_dict(self):
     d = {}
-    for key in self.store:
-      value = self[key]
+    for key in self.current:
+      value = self.current[key]
       if isinstance(value, RecursiveDict):
         d[key] = value.to_dict()
       else:
@@ -266,14 +247,10 @@ class InterpolatedDict(RecursiveDict):
     blocks = self.config['interpolation_regex'].findall(value)
     interpolated_value = value
     for block in blocks:
-      print("Interpolating: " + block + " in " + str(self.full_key))
-      full_block_key = block
-      if self.full_key:
-        full_block_key = self.full_key + self.config['separator'] + block
-      if isinstance(self.root[full_block_key], str):
-        print(full_block_key)
+      block_value = self[block]
+      if isinstance(block_value, str):
         interpolated_value = interpolated_value.replace('{{' + block + '}}',
-                                                        self.root[full_block_key])
+                                                        block_value)
       else:
         raise KeyError(block)
 

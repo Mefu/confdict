@@ -7,7 +7,7 @@ import pytest
 from confdict import ConfDict
 
 def test_confdict(capsys):
-  with capsys.disabled():
+  # with capsys.disabled():
     test_config = {
       '__separator': '/',
       '__self_key': '.',
@@ -74,6 +74,7 @@ def test_confdict(capsys):
     assert cd['k2/k22/../k21'] == cd['k2/k21']
     assert cd['k2/../../../k2'] == cd['k2']
     assert cd['k2/<key>'] == 'k2'
+    assert cd['k2']['k22']['<key>'] == 'k22'
 
     # interpolation
     assert cd['k5/k51'] == 'v32'
