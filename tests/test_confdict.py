@@ -7,7 +7,7 @@ import pytest
 from confdict import ConfDict
 
 def test_confdict(capsys):
-  # with capsys.disabled():
+  with capsys.disabled():
     test_config = {
       '__separator': '/',
       '__self_key': '.',
@@ -40,7 +40,7 @@ def test_confdict(capsys):
         'k53': 'v53',
       },
       k6 = {
-        '.+': {
+        'fallback': {
           'k611': 'v611f',
           'k612': {
             'k6121': 'v6121f',
@@ -74,7 +74,6 @@ def test_confdict(capsys):
     assert cd['k2/k22/../k21'] == cd['k2/k21']
     assert cd['k2/../../../k2'] == cd['k2']
     assert cd['k2/<key>'] == 'k2'
-    assert cd['k2']['k22']['<key>'] == 'k22'
 
     # interpolation
     assert cd['k5/k51'] == 'v32'
@@ -110,7 +109,7 @@ def test_confdict(capsys):
         },
       },
       'k5': {
-        '.+': {
+        'fallback': {
           'k541': 'v541f',
           'k542': {
             'k5421': 'v5421f',
@@ -119,7 +118,7 @@ def test_confdict(capsys):
         'k53': 'v53_2',
       },
       'k6': {
-        '.+': {
+        'fallback': {
           'k612': {
             'k6122': 'v6122f_2',
           },
