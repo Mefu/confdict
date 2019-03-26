@@ -1,4 +1,5 @@
 # standard libs
+from textwrap import dedent
 
 # third party libs
 import pytest
@@ -6,227 +7,465 @@ import pytest
 # project imports
 from confdict import ConfDict
 
-def test_confdict(capsys):
-  with capsys.disabled():
-    test_config = {
-      '__separator': '/',
-      '__self_key': '.',
-      '__parent_key': '..',
-      '__root_key': '...',
-      '__key_key': '<key>',
-      '__interpolation_regex': r'{{([^{}]*)}}',
-    }
 
-    cd = ConfDict(
-      k1 = 'v1',
-      k2 = {
-        'k21': 'v21',
-        'k22': {
-          'k221': 'v221',
-          'k222': 'v222',
-        }
+def test_get():
+  cd = ConfDict(
+    k1='v1',
+    k2={
+      'k21': 'v21',
+      'k22': {
+        'k222': 'v222',
       },
-      k3 = {
-        'k31': 'v31',
-        'k32': 'v32',
+    },
+    k3={
+      'k31': 'v31',
+      'k32': 'v32',
+    },
+  )
+
+  assert cd['k1'] == 'v1'
+  assert cd['k2/k22/k222'] == 'v222'
+  assert cd['k2']['k22/k222'] == 'v222'
+  assert cd['k2']['k22']['k222'] == 'v222'
+  assert cd['k3'] == {
+    'k31': 'v31',
+    'k32': 'v32',
+  }
+
+  assert cd['.'] == cd
+  assert cd['k2/..'] == cd
+  assert cd['k2/k22/...'] == cd
+  assert cd['k2/k22/../k21'] == cd['k2/k21']
+  assert cd['k2/../../../k1'] == cd['k1']
+  assert cd['k2/<key>'] == 'k2'
+
+
+def test_set():
+  cd = ConfDict(
+    k1='v1',
+    k2={
+      'k22': {
+        'k222': 'v222',
       },
-      k5 = {
-        'k51': '{{.../k3/k32}}',
-        'k52': {
-          'k521': '{{./k522}}',
-          'k522': '{{../k53}}',
-          'k523': '{{<key>}}',
+    },
+    k3={
+      'k31': 'v31',
+      'k32': 'v32',
+    },
+  )
+
+  cd['k1'] = 'v1_2'
+  assert cd['k1'] == 'v1_2'
+
+  cd['k2/k22/k222'] = 'v222_2'
+  assert cd['k2/k22/k222'] == 'v222_2'
+
+  cd['k2']['k22']['k222'] = 'v222_3'
+  assert cd['k2/k22/k222'] == 'v222_3'
+
+  cd['k2/k22/../k21'] = 'v21'
+  assert cd['k2/k22/../k21'] == 'v21'
+
+
+def test_delete():
+  cd = ConfDict(
+    k1='v1',
+    k2={
+      'k22': {
+        'k221': 'v221',
+        'k222': 'v222',
+      },
+    },
+    k3={
+      'k31': 'v31',
+      'k32': 'v32',
+    },
+  )
+
+  del cd['k2/k22/k222']
+  with pytest.raises(KeyError):
+    cd['k2/k22/k222']
+
+  del cd['k3']
+  with pytest.raises(KeyError):
+    cd['k3/k31']
+  with pytest.raises(KeyError):
+    cd['k3/k32']
+
+
+def test_update():
+  cd = ConfDict(
+    k1={
+      'k11': 'v11',
+      'k12': 'v12',
+    }, )
+
+  cd.update({
+    'k1': {
+      'k12': 'v12_2',
+      'k13': 'v13'
+    },
+  })
+  assert cd['k1/k11'] == 'v11'
+  assert cd['k1/k12'] == 'v12_2'
+  assert cd['k1/k13'] == 'v13'
+
+
+def test_contains():
+  cd = ConfDict(
+    k1={
+      'k11': 'v11',
+      'k12': {
+        'k121': 'v121',
+      },
+    }, )
+
+  assert 'k1' in cd
+  assert 'k1/k12' in cd
+  assert 'k1/k12/..' in cd
+  assert '<key>' in cd
+
+
+def test_interpolation_get():
+  cd = ConfDict(
+    k1={
+      'k11': 'v11',
+    },
+    k2={
+      'k21': '{{.../k1/k11}}',
+      'k22': {
+        'k221': '{{./k222}}',
+        'k222': '{{../k23}}',
+        'k223': '{{<key>}}',
+      },
+      'k23': 'v23',
+      'k24': '{{k22}}'
+    },
+  )
+
+  assert cd['k1/k11'] == 'v11'
+  assert cd['k2/k22/k221'] == 'v23'
+  assert cd['k2/k22/k222'] == 'v23'
+  assert cd['k2/k22/k223'] == 'k22'
+  assert cd['k2/k24/k221'] == 'v23'
+  assert cd['k2/k24/k222'] == 'v23'
+  assert cd['k2/k24/k223'] == 'k22'
+
+
+def test_interpolation_set():
+  cd = ConfDict(k1={'k11': 'v11', 'k12': '{{k11}}'}, )
+
+  cd['k1/k11'] = 'v11_2'
+  assert cd['k1/k12'] == 'v11_2'
+
+
+def test_interpolation_delete():
+  cd = ConfDict(k1={'k11': 'v11', 'k12': '{{k11}}'}, )
+
+  del cd['k1/k11']
+  with pytest.raises(KeyError):
+    cd['k1/k12']
+
+
+def test_fallback_get():
+  cd = ConfDict(
+    k1={
+      'fallback': {
+        'k111': 'v111f',
+        'k112': {
+          'k1121': 'v1121f',
+          'k1122': 'v1122f',
         },
-        'k53': 'v53',
+        'k113': 'v113f',
       },
-      k6 = {
-        'fallback': {
-          'k611': 'v611f',
-          'k612': {
-            'k6121': 'v6121f',
-            'k6122': 'v6122f',
-          },
-          'k613': '{{<key>}}',
-          'k614': '{{k613}}',
+      'k11': {
+        'k111': 'v111',
+        'k112': {
+          'k1121': 'v1121',
         },
-        'k61': {
-          'k611': 'v611',
-          'k612': {
-            'k6121': 'v6121',
-          },
-          'k613': 'v613',
-        },
+        'k113': 'v113',
       },
-      **test_config
-    )
+    }, )
 
-    # standard access
-    assert cd['k1'] == 'v1'
-    assert cd['k2/k22/k222'] == 'v222'
-    assert cd['k2']['k22/k222'] == 'v222'
-    assert cd['k2']['k22']['k222'] == 'v222'
-    assert cd['k3'] == { 'k31': 'v31', 'k32': 'v32', }
+  assert cd['k1/k11/k111'] == 'v111'
+  assert cd['k1/k11/k112/k1121'] == 'v1121'
+  assert cd['k1/k11/k113'] == 'v113'
 
-    # relative access
-    assert cd['.'] == cd
-    assert cd['k2/..'] == cd
-    assert cd['k2/k22/...'] == cd
-    assert cd['k2/k22/../k21'] == cd['k2/k21']
-    assert cd['k2/../../../k2'] == cd['k2']
-    assert cd['k2/<key>'] == 'k2'
+  assert cd['k1/k12/k111'] == 'v111f'
+  assert cd['k1/k11/k112/k1122'] == 'v1122f'
+  assert cd['k1/k12'].to_dict() == {
+    'k111': 'v111f',
+    'k112': {
+      'k1121': 'v1121f',
+      'k1122': 'v1122f',
+    },
+    'k113': 'v113f',
+  }
 
-    # interpolation
-    assert cd['k5/k51'] == 'v32'
-    assert cd['k5/k52/k521'] == 'v53'
-    assert cd['k5/k52/k522'] == 'v53'
-    assert cd['k5/k52/k523'] == 'k52'
 
-    # fallback
-    assert cd['k6/k61/k611'] == 'v611'
-    assert cd['k6/k61/k612/k6121'] == 'v6121'
-    assert cd['k6/k61/k612/k6122'] == 'v6122f'
-    assert cd['k6/k61/k613'] == 'v613'
+def test_fallback_set():
+  cd = ConfDict(
+    k1={
+      'k11': 'v11',
+      'k12': 'v12',
+    },
+  )
 
-    # fallback and interpolation
-    assert cd['k6/k62/k613'] == 'k62'
-    assert cd['k6/k62/k614'] == 'k62'
-    assert cd['k6/k61/k614'] == 'v613'
+  cd['fallback'] = {
+    'k13': 'v13f',
+  }
 
-    # contains
-    assert 'k2' in cd
-    assert 'k2/k22' in cd
-    assert 'k2/k22/..' in cd
-    assert '<key>' in cd
-    # fallbacks should not be considered as contained
-    assert not 'k6/k61/k612/k6122' in cd
+  assert cd['k1/k13'] == 'v13f'
 
-    # update
-    cd.update({
-      'k2': {
-        'k21': 'v21_2',
-        'k22': {
-          'k223': 'v223',
-        },
+  cd['fallback/k13'] = 'v13f_2'
+  assert cd['k1/k13'] == 'v13f_2'
+
+
+def test_fallback_delete():
+  cd = ConfDict(
+    fallback={
+      'k13': 'v13f',
+    },
+    k1={
+      'k11': 'v11',
+      'k12': 'v12',
+    },
+  )
+
+  del cd['fallback/k13']
+  with pytest.raises(KeyError):
+    cd['k1/k13']
+
+
+def test_fallback_update():
+  cd = ConfDict(
+    fallback={
+      'k13': 'v13f',
+    },
+    k1={
+      'k11': 'v11',
+      'k12': 'v12',
+    },
+  )
+
+  cd.update({
+    'fallback': {
+      'k13': 'v13f_2',
+      'k14': 'v14f'
+    },
+  })
+  assert cd['k1/k13'] == 'v13f_2'
+  assert cd['k1/k14'] == 'v14f'
+
+
+def test_fallback_contains():
+  cd = ConfDict(
+    fallback={
+      'k13': 'v13f',
+    },
+    k1={
+      'k11': 'v11',
+      'k12': 'v12',
+    },
+  )
+  # fallbacks are not contained
+  assert not 'k1/k13' in cd
+
+
+def test_fallback_interpolation():
+  cd = ConfDict(
+    k1={
+      'fallback': {
+        'k111': '{{<key>}}',
+        'k112': '{{k111}}',
+        'k113': '{{k112}}random{{k111}}',
       },
-      'k5': {
-        'fallback': {
-          'k541': 'v541f',
-          'k542': {
-            'k5421': 'v5421f',
-          },
-        },
-        'k53': 'v53_2',
+      'k11': {
+        'k111': 'v111',
       },
-      'k6': {
-        'fallback': {
-          'k612': {
-            'k6122': 'v6122f_2',
-          },
-        },
+    }, )
+  assert cd['k1/k12/k111'] == 'k12'
+  assert cd['k1/k12/k112'] == 'k12'
+  assert cd['k1/k12/k113'] == 'k12randomk12'
+  assert cd['k1/k11/k112'] == 'v111'
+  assert cd['k1/k11/k113'] == 'v111randomv111'
+  assert cd['k1/fallback/k112'] == '{{k111}}'
+
+
+def test_to_dict():
+  cd = ConfDict(
+    fallback={
+      'k11': {
+        'k111': 'v111f',
       },
-      'k7': {
-        'k71': 'v71',
-        'k72': {
-          'k721': 'v721',
-          'k722': 'v722',
-        },
+      'k12': {
+        'k121': '{{../k11/k111}}',
+        'k122': '{{k121}}',
       },
-    })
-
-    assert cd['k2/k21'] == 'v21_2'
-    assert cd['k2/k22/k221'] == 'v221'
-    assert cd['k2/k22/k222'] == 'v222'
-    assert cd['k2/k22/k223'] == 'v223'
-    assert cd['k5/k53'] == 'v53_2'
-    assert cd['k7/k72/k721'] == 'v721'
-
-    # interpolation update
-    assert cd['k5/k51'] == 'v32'
-    assert cd['k5/k52/k521'] == 'v53_2'
-    assert cd['k5/k52/k522'] == 'v53_2'
-
-    # fallback update
-    assert cd['k5/k54/k541'] == 'v541f'
-    assert cd['k5/k54/k542'] == { 'k5421': 'v5421f' }
-    assert cd['k6/k61/k612/k6122'] == 'v6122f_2'
-
-    # cannot update
-
-    # delete
-    del cd['k2/k22/k222']
-    del cd['k6/k61/k612/k6121']
-    del cd['k5/k53']
-    del cd['k6/fallback/k611']
-    del cd['k7/k72']
-
-    with pytest.raises(KeyError):
-      cd['k2/k22/k222']
-
-    with pytest.raises(KeyError):
-      cd['k7/k72']
-
-    # interpolation fallback
-    with pytest.raises(KeyError):
-      cd['k5/k52/k521']
-
-    with pytest.raises(KeyError):
-      cd['k5/k52/k522']
-
-    # delete fallback
-    assert cd['k6/k61/k612/k6121'] == 'v6121f'
-
-
-    # to dict
-    cd['k5/k53'] = 'v53_3'
-
-    assert cd.to_dict() == {
-      'k1': 'v1',
-      'k2': {
-        'k21': 'v21_2',
-        'k22': {
-          'k221': 'v221',
-          'k223': 'v223',
-        },
+    },
+    k1={
+      'k11': {
+        'k111': 'v111',
+        'k112': '{{k111}}',
       },
-      'k3': {
-        'k31': 'v31',
-        'k32': 'v32',
-      },
-      'k5': {
-        'fallback': {
-          'k541': 'v541f',
-          'k542': {
-            'k5421': 'v5421f',
-          },
-        },
-        'k51': 'v32',
-        'k52': {
-          'k521': 'v53_3',
-          'k522': 'v53_3',
-          'k523': 'k52',
-        },
-        'k53': 'v53_3',
-      },
-      'k6': {
-        'fallback': {
-          'k612': {
-            'k6121': 'v6121f',
-            'k6122': 'v6122f_2',
-          },
-          'k613': '{{<key>}}',
-          'k614': '{{k613}}',
-        },
-        'k61': {
-          'k611': 'v611',
-          'k612': {
-          },
-          'k613': 'v613',
-        },
-      },
-      'k7': {
-        'k71': 'v71',
-      },
-    }
+    },
+  )
 
-    # str
-    assert str(cd)[:8] == 'ConfDict'
+  assert cd.to_dict() == {
+    'fallback': {
+      'k11': {
+        'k111': 'v111f',
+      },
+      'k12': {
+        'k121': '{{../k11/k111}}',
+        'k122': '{{k121}}',
+      },
+    },
+    'k1': {
+      'k11': {
+        'k111': 'v111',
+        'k112': 'v111',
+      },
+    },
+  }
+
+
+def test_custom_settings():
+  test_config = {
+    '__separator': '>',
+    '__self_key': '!',
+    '__parent_key': '!!',
+    '__root_key': '!!!',
+    '__key_key': '__key__',
+    '__interpolation_regex': r'(\[\[([^\[\]]*)\]\])',
+    '__fallback_key': 'fb',
+  }
+
+  cd = ConfDict(
+    fb={
+      'k11': {
+        'k111': 'v111f',
+      },
+      'k12': {
+        'k121': '[[!!>k11>k111]]',
+        'k122': '[[k121]]',
+      },
+    },
+    k1={
+      'k11': {
+        'k111': 'v111',
+        'k112': '[[k111]]',
+      },
+    },
+    **test_config,
+  )
+
+  assert cd['k1>k11>k111'] == 'v111'
+  assert cd['!'] == cd
+  assert cd['k1>k11>k112'] == 'v111'
+  assert cd['k2>k12>k122'] == 'v111f'
+
+
+def test_keys():
+  cd = ConfDict(
+    k1='v1',
+    k2={
+      'k21': 'v21',
+      'k22': {
+        'k221': 'v221',
+      },
+    },
+    k3={
+      'k31': 'v31',
+      'k32': 'v32',
+    },
+  )
+
+  assert list(cd.keys()) == [
+    'k1',
+    'k2/k21',
+    'k2/k22/k221',
+    'k3/k31',
+    'k3/k32',
+  ]
+
+
+def test_items():
+  cd = ConfDict(
+    k1='v1',
+    k2={
+      'k21': 'v21',
+      'k22': {
+        'k221': 'v221',
+      },
+    },
+    k3={
+      'k31': 'v31',
+      'k32': 'v32',
+    },
+  )
+
+  assert list(cd.items()) == [
+    ('k1', 'v1'),
+    ('k2/k21', 'v21'),
+    ('k2/k22/k221', 'v221'),
+    ('k3/k31', 'v31'),
+    ('k3/k32', 'v32'),
+  ]
+
+
+def test_to_str():
+  cd = ConfDict(
+    fallback={
+      'k11': {
+        'k111': 'v111f',
+      },
+      'k12': {
+        'k121': '{{../k11/k111}}',
+        'k122': '{{k121}}',
+      },
+    },
+    k1={
+      'k11': {
+        'k111': 'v111',
+        'k112': '{{k111}}',
+      },
+    },
+  )
+
+  assert str(cd) == dedent('''
+    ConfDict
+    { 'fallback': { 'k11': {'k111': 'v111f'},
+                    'k12': {'k121': '{{../k11/k111}}', 'k122': '{{k121}}'}},
+      'k1': {'k11': {'k111': 'v111', 'k112': '{{k111}}'}}}
+  ''')[1:-1]  # remove first and last newline
+
+def test_realize():
+  cd = ConfDict(
+    fallback={
+      'k11': {
+        'k111': 'v111f',
+        'k112': '{{../<key>}}',
+      },
+      'k12': {
+        'k121': '{{../k11/k111}}',
+        'k122': '{{k121}}',
+      },
+    },
+  )
+
+  assert cd['k1'].to_dict() == {
+    'k11': {
+      'k111': 'v111f',
+      'k112': 'k1',
+    },
+    'k12': {
+      'k121': 'v111f',
+      'k122': 'v111f',
+    },
+  }
+
+  cd['k1'].realize()
+  del cd['fallback']
+
+  assert cd['k1/k11/k112'] == 'k1'

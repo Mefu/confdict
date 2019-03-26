@@ -16,6 +16,10 @@ virtualenv:
 	@echo "VirtualENV Setup Complete."
 	@echo
 
+format:
+	yapf --in-place --recursive confdict
+	yapf --in-place --recursive tests
+
 test:
 	python -m pytest \
 		-vv \

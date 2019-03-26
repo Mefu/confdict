@@ -97,8 +97,16 @@ optional = false
 python-versions = ">=2.6, !=3.0.*, !=3.1.*"
 version = "1.12.0"
 
+[[package]]
+category = "dev"
+description = "A formatter for Python code."
+name = "yapf"
+optional = false
+python-versions = "*"
+version = "0.26.0"
+
 [metadata]
-content-hash = "dcaa019f1f578ec5dfa3a1f22be37291ce8faa3c77960cdff26eb7a9f1b16b2f"
+content-hash = "3518c9dc656a9bd3184c17b1b766a58a9c5524731374cb2a97655d92ccd76fbd"
 python-versions = "^3.7"
 
 [metadata.hashes]
@@ -112,3 +120,4 @@ py = ["64f65755aee5b381cea27766a3a147c3f15b9b6b9ac88676de66ba2ae36793fa", "dc639
 pytest = ["592eaa2c33fae68c7d75aacf042efc9f77b27c08a6224a4f59beab8d9a420523", "ad3ad5c450284819ecde191a654c09b0ec72257a2c711b9633d677c71c9850c4"]
 pytest-cov = ["0ab664b25c6aa9716cbf203b17ddb301932383046082c081b9848a0edf5add33", "230ef817450ab0699c6cc3c9c8f7a829c34674456f2ed8df1fe1d39780f7c87f"]
 six = ["3350809f0555b11f552448330d0b52d5f24c91a322ea4a15ef22629740f3761c", "d16a0141ec1a18405cd4ce8b4613101da75da0e9a7aec5bdd4fa804d0e0eba73"]
+yapf = ["edb47be90a56ca6f3075fe24f119a22225fbd62c66777b5d3916a7e9e793891b", "f58069d5e0df60c078f3f986b8a63acfda73aa6ebb7cd423f6eabd1cb06420ba"]

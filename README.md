@@ -15,7 +15,7 @@ Example usage of all of its extra features are as follows.
   __key_key = '<key>',
   __interpolation_regex = r'{{([^{}]*)}}',
 
-  # You can give dict contents directly to constructor as keyword arguments
+  # Remaining arguments will directly be stored in underlying dict
   users = {
     # fallback dict is used when a key is not found at that level
     'fallback': {
@@ -28,7 +28,9 @@ Example usage of all of its extra features are as follows.
   }
 )
 >>> cd
-ConfDict {'users': {'fallback': {'username': 'fallback', 'ssh_private_key': '/home/fallback/.ssh/id_rsa'}}}
+ConfDict
+{ 'users': { 'fallback': { 'ssh_private_key': '/home/{{username}}/.ssh/id_rsa',
+                           'username': '{{<key>}}'}}}
 >>> cd['users/john/username']
 'john'
 >>> cd['users/john/ssh_private_key']

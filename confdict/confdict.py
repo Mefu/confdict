@@ -2,6 +2,7 @@
 from collections.abc import Mapping, MutableMapping
 from copy import copy
 import re
+from pprint import pformat
 
 # third party libs
 
@@ -10,6 +11,7 @@ import re
 
 class RecursiveDict(MutableMapping):
   """A dictionary that allows recursive and relative access to its contents."""
+
   def __init__(self, *args, **kwargs):
     # recursive structure
     self.root = kwargs.pop('__root', None)
@@ -19,7 +21,7 @@ class RecursiveDict(MutableMapping):
       self.root = self
 
     # keys and chars used for various functionalities
-    # defaults
+
     self.config = {
       'separator': '/',
       'self_key': '.',
@@ -28,45 +30,42 @@ class RecursiveDict(MutableMapping):
       'key_key': '<key>',
     }
 
-    # from parent
-    if self.parent:
-      self.config.update(self.parent.config)
+    self.config.update(kwargs.pop('__config', {}))
 
-    # from kwargs
-    if '__separator' in kwargs:
-      self.config['separator'] = kwargs.pop('__separator')
-    if '__self_key' in kwargs:
-      self.config['self_key'] = kwargs.pop('__self_key')
-    if '__parent_key' in kwargs:
-      self.config['parent_key'] = kwargs.pop('__parent_key')
-    if '__root_key' in kwargs:
-      self.config['root_key'] = kwargs.pop('__root_key')
-    if '__key_key' in kwargs:
-      self.config['key_key'] = kwargs.pop('__key_key')
-
-    if '__config' in kwargs:
-      self.config = kwargs.pop('__config')
-
-    self.builtin_keys = [
-      self.config['self_key'],
-      self.config['parent_key'],
-      self.config['root_key'],
-      self.config['key_key'],
-    ]
+    for key, default in self.config.items():
+      self.config[key] = kwargs.pop('__' + key, default)
 
     # underlying storage
     self.store = dict()
     self.update(dict(*args, **kwargs))
 
   @property
+  def builtin_keys(self):
+    """
+    Built-in keys for relative access or key access.
+    """
+    return [
+      self.config['self_key'],
+      self.config['parent_key'],
+      self.config['root_key'],
+      self.config['key_key'],
+    ]
+
+  @property
   def full_path(self):
+    """
+    Returns full path to current dictionary from root.
+    """
     if self.parent is None:
       return []
     else:
-      return self.parent.full_path + [ self.key ]
+      return self.parent.full_path + [self.key]
 
   @property
   def full_key(self):
+    """
+    Returns full key to current dictionary from root.
+    """
     return self.path_to_key(self.full_path)
 
   def key_to_path(self, key):
@@ -75,13 +74,11 @@ class RecursiveDict(MutableMapping):
     By default, separates key using `separator` if it is string.
     Must return `list`, cannot assume type of `key`.
     """
-    if isinstance(key, str) and self.config['separator'] in key:
+    assert type(key) == str
+    if self.config['separator'] in key:
       return key.split(self.config['separator'])
-    # this is not getting hit with tests, so I removed it
-    # elif isinstance(key, list):
-    #   return key
     else:
-      return [ key ]
+      return [key]
 
   def path_to_key(self, path):
     """
@@ -93,24 +90,44 @@ class RecursiveDict(MutableMapping):
     return self.config['separator'].join(path)
 
   def key_not_found(self, key, error):
+    """
+    Override this to return a value in case of key not found error.
+    """
     raise error
 
   def path_not_found(self, path, error):
+    """
+    Override this to return a value in case of path not found error.
+    """
     raise error
 
   def key_before_get(self, key):
+    """
+    Override this to modify key before get.
+    """
     return key
 
   def path_before_get(self, path):
+    """
+    Override this to modify path before get.
+    """
     return path
 
   def value_after_get(self, value):
+    """
+    Override this to modify value before returning.
+    """
     return value
 
   def get(self, path):
+    """
+    Recursively follows down the path and returns the result found.
+    """
+    # If path contains only one part
     if len(path) == 1:
       current_key = path[0]
       current_key = self.key_before_get(current_key)
+      # Check for built in keys
       if current_key == self.config['self_key']:
         return self
       elif current_key == self.config['parent_key']:
@@ -124,6 +141,7 @@ class RecursiveDict(MutableMapping):
         return self.key
       else:
         try:
+          # try to return from store
           value = self.store[current_key]
         except KeyError as e:
           value = self.key_not_found(current_key, e)
@@ -131,6 +149,7 @@ class RecursiveDict(MutableMapping):
         value = self.value_after_get(value)
         return value
     else:
+      # recursion, best thing invented since sliced bread
       return self.get(path[:1]).get(path[1:])
 
   def __getitem__(self, key):
@@ -146,24 +165,38 @@ class RecursiveDict(MutableMapping):
       return self.path_not_found(path, e)
 
   def key_before_set(self, key):
+    """
+    Override this to modify key before set.
+    """
     return key
 
   def path_before_set(self, path):
+    """
+    Override this to modify path before set.
+    """
     return path
 
   def value_before_set(self, value):
+    """
+    Override this to modify value before set.
+    """
     return value
 
   def set(self, path, value):
+    """
+    Recursively follows down the path until last part using get, and sets
+    value in last recursion.
+    """
     if len(path) == 1:
       current_key = path[0]
       current_key = self.key_before_set(current_key)
       if isinstance(value, Mapping):
-        self.store[current_key] = self.__class__(__root=self.root,
-                                                 __parent=self,
-                                                 __key=current_key,
-                                                 __config=self.config,
-                                                 **value)
+        self.store[current_key] = self.__class__(
+          __root=self.root,
+          __parent=self,
+          __key=current_key,
+          __config=self.config,
+          **value)
       else:
         value = self.value_before_set(value)
         self.store[current_key] = value
@@ -171,18 +204,12 @@ class RecursiveDict(MutableMapping):
       self.get(path[:1]).set(path[1:], value)
 
   def __setitem__(self, key, value):
+    """
+    Transforms key to path and tries to set value to location of path.
+    """
     path = self.key_to_path(copy(key))
     path = self.path_before_set(path)
     self.set(path, value)
-
-  def __iter__(self):
-    for key in self.store:
-      value = self.store[key]
-      if isinstance(value, Mapping):
-        for inner_key in value:
-          yield self.path_to_key([ key, inner_key ])
-      else:
-        yield self.path_to_key([ key ])
 
   def delete(self, path):
     if len(path) == 1:
@@ -191,6 +218,9 @@ class RecursiveDict(MutableMapping):
       self.get(path[:1]).delete(path[1:])
 
   def __delitem__(self, key):
+    """
+    Transforms key to path and tries to remove value at the location of path.
+    """
     path = self.key_to_path(copy(key))
     self.delete(path)
 
@@ -201,14 +231,30 @@ class RecursiveDict(MutableMapping):
       return self.contains(path[:1]) and self.get(path[:1]).contains(path[1:])
 
   def __contains__(self, key):
+    """
+    Transforms key to path and tries to check if key exists.
+    """
     path = self.key_to_path(copy(key))
     return self.contains(path)
+
+  def __iter__(self):
+    """
+    Returns paths containing values.
+    """
+    for key in self.store:
+      value = self.store[key]
+      if isinstance(value, Mapping):
+        for inner_key in value:
+          yield self.path_to_key([key, inner_key])
+      else:
+        yield self.path_to_key([key])
 
   def __len__(self):
     return sum(1 for _ in self)
 
   def __unicode__(self):
-    return str(self.__class__.__name__) + " " + str(self.to_dict())
+    return str(self.__class__.__name__) + "\n" + pformat(
+      self.to_dict(True), indent=2, width=80, compact=False)
 
   def __repr__(self):
     return self.__unicode__()
@@ -224,12 +270,15 @@ class RecursiveDict(MutableMapping):
       else:
         self[k] = v
 
-  def to_dict(self):
+  def to_dict(self, store_only=False):
     d = {}
     for key in self.store:
-      value = self[key]
+      if store_only:
+        value = self.store[key]
+      else:
+        value = self[key]
       if isinstance(value, RecursiveDict):
-        d[key] = value.to_dict()
+        d[key] = value.to_dict(store_only)
       else:
         d[key] = value
     return d
@@ -241,31 +290,37 @@ class InterpolatedDict(RecursiveDict):
   By default, it will try to evaluate values containing double curly braces.
   It will also evaluate "<key>" to key of current dictionary level.
   """
+
   def __init__(self, *args, **kwargs):
-    interpolation_regex = kwargs.pop('__interpolation_regex', None)
+    kwargs['__config'] = kwargs.get('__config', {})
+    kwargs['__config']['interpolation_regex'] = kwargs['__config'].get(
+      'interpolation_regex', r'({{([^{}]*)}})')
+
     super(InterpolatedDict, self).__init__(*args, **kwargs)
-    if interpolation_regex is not None:
-      self.config['interpolation_regex'] = re.compile(interpolation_regex)
-    elif 'interpolation_regex' not in self.config:
-      self.config['interpolation_regex'] = re.compile(r'{{([^{}]*)}}')
 
   def value_after_get(self, value):
+    """
+    Tries to interpolate value if there is an instance matching.
+    """
     if isinstance(value, str):
       return self.interpolate_value(value)
     else:
       return super(InterpolatedDict, self).value_after_get(value)
 
   def interpolate_value(self, value):
-    blocks = self.config['interpolation_regex'].findall(value)
+    rgx = re.compile(self.config['interpolation_regex'])
+    blocks = rgx.findall(value)
     interpolated_value = value
-    for block in blocks:
-      full_block_key = self.full_key + self.config['separator'] + block
-      if isinstance(self.root[full_block_key], str):
-        interpolated_value = interpolated_value.replace('{{' + block + '}}', self.root[full_block_key])
-      else:
-        raise KeyError(block)
+    for full_block, int_block in blocks:
+      full_block_key = self.full_key + self.config['separator'] + int_block
+      block_value = self.root[full_block_key]
+      if isinstance(block_value, str):
+        interpolated_value = interpolated_value.replace(full_block, block_value)
+      elif isinstance(block_value, InterpolatedDict):
+        interpolated_value = block_value
 
     return interpolated_value
+
 
 class ConfDict(InterpolatedDict):
   """
@@ -274,30 +329,23 @@ class ConfDict(InterpolatedDict):
   dictionary with remaining path. If this level does not contain a fallback it
   will try to fallback to parents fallback until it reaches root level.
   """
+
   def __init__(self, *args, **kwargs):
-    self.fallback = kwargs.pop('fallback', None)
-    is_fallback = kwargs.pop('__is_fallback', None)
+    kwargs['__config'] = kwargs.get('__config', {})
+    kwargs['__config']['fallback_key'] = kwargs['__config'].get(
+      'fallback_key', 'fallback')
+    kwargs['__config']['is_fallback'] = kwargs['__config'].get(
+      'is_fallback', False)
+
+    self.fallback = None
     super(ConfDict, self).__init__(*args, **kwargs)
 
-    if self.fallback:
-      self.fallback = ConfDict(__root=self.root,
-                               __parent=self,
-                               __key='fallback',
-                               __is_fallback=True,
-                               __config=self.config,
-                               **self.fallback)
-
-    if is_fallback is not None:
-      self.config['is_fallback'] = is_fallback
-    elif 'is_fallback' not in self.config:
-      self.config['is_fallback'] = False
-
   def key_not_found(self, key, error):
-    if key.startswith('fallback') and self.fallback:
+    if key.startswith(self.config['fallback_key']) and self.fallback:
       if self.config['separator'] in key:
         self.fallback.key = key.split(self.config['separator'])[1]
       else:
-        self.fallback.key = 'fallback'
+        self.fallback.key = self.config['fallback_key']
       return self.fallback
 
     return super(ConfDict, self).key_not_found(key, error)
@@ -307,7 +355,8 @@ class ConfDict(InterpolatedDict):
 
     for idx in range(0, len(path)):
       fallback_path = copy(path)
-      fallback_path[idx] = self.config['separator'].join([ 'fallback', fallback_path[idx] ])
+      fallback_path[idx] = self.config['separator'].join(
+        [self.config['fallback_key'], fallback_path[idx]])
       fallback_paths.append(fallback_path)
 
     fallback_paths.reverse()
@@ -322,28 +371,40 @@ class ConfDict(InterpolatedDict):
 
   def value_after_get(self, value):
     # do not interpolate if accessed directly as fallback
-    if self.config['is_fallback'] and self.key == 'fallback':
+    if self.config['is_fallback'] and self.key == self.config['fallback_key']:
       return value
     else:
       return super(ConfDict, self).value_after_get(value)
 
   def update(self, d):
     dcopy = copy(d)
-    if 'fallback' in dcopy:
+    if self.config['fallback_key'] in dcopy:
       if self.fallback:
-        self.fallback.update(dcopy.pop('fallback'))
+        self.fallback.update(dcopy.pop(self.config['fallback_key']))
       else:
-        self.fallback = ConfDict(__root=self.root,
-                                 __parent=self,
-                                 __key='fallback',
-                                 __is_fallback=True,
-                                 **dcopy.pop('fallback'))
+        self.fallback = ConfDict(
+          __root=self.root,
+          __parent=self,
+          __key=self.config['fallback_key'],
+          __is_fallback=True,
+          __config=self.config,
+          **dcopy.pop(self.config['fallback_key']))
     super(ConfDict, self).update(dcopy)
 
-  def to_dict(self):
-    d = super(ConfDict, self).to_dict()
-    if self.fallback:
-      self.fallback.key = 'fallback'
-      d['fallback'] = self.fallback.to_dict()
-    return d
+  def realize(self):
+    """
+    Call this to create an instance of current fallback with current key used
+    to access to fallback.
+    """
+    if self.config[
+        'is_fallback'] and not self.key == self.config['fallback_key']:
+      self.parent.update({
+        self.key: self.to_dict()
+      })
 
+  def to_dict(self, store_only=False):
+    d = super(ConfDict, self).to_dict(store_only)
+    if self.fallback:
+      self.fallback.key = self.config['fallback_key']
+      d[self.config['fallback_key']] = self.fallback.to_dict(True)
+    return d
