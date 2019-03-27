@@ -294,6 +294,11 @@ def test_fallback_interpolation():
   assert cd['k1/k11/k112'] == 'v111'
   assert cd['k1/k11/k113'] == 'v111randomv111'
   assert cd['k1/fallback/k112'] == '{{k111}}'
+  assert cd['k1/k12'].to_dict() == {
+    'k111': 'k12',
+    'k112': 'k12',
+    'k113': 'k12randomk12',
+  }
 
 
 def test_to_dict():
@@ -442,7 +447,7 @@ def test_to_str():
     ConfDict
     { 'fallback': { 'k11': {'k111': 'v111f'},
                     'k12': {'k121': '{{../k11/k111}}', 'k122': '{{k121}}'}},
-      'k1': {'k11': {'k111': 'v111', 'k112': '{{k111}}'}}}
+      'k1': {'k11': {'k111': 'v111', 'k112': 'v111'}}}
   '''
   )[1:-1]  # remove first and last newline
 
@@ -460,6 +465,9 @@ def test_realize():
       },
     },
     k2={
+      'k11': {
+        'k111': 'v111',
+      },
       'k23': 'v23',
     },
   )
@@ -475,9 +483,8 @@ def test_realize():
     },
   }
 
-  cd['k1'].realizeTo('.')
-  cd['k2/k11'].realizeTo('k2')
-  cd['k2/k12'].realizeTo('k2')
+  cd['fallback'].realize('k1')
+  cd['fallback'].realize('k2')
 
   del cd['fallback']
 
@@ -494,12 +501,12 @@ def test_realize():
 
   assert cd['k2'].to_dict() == {
     'k11': {
-      'k111': 'v111f',
+      'k111': 'v111',
       'k112': 'k2',
     },
     'k12': {
-      'k121': 'v111f',
-      'k122': 'v111f',
+      'k121': 'v111',
+      'k122': 'v111',
     },
     'k23': 'v23',
   }

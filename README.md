@@ -13,7 +13,7 @@ Example usage of all of its extra features are as follows.
   __parent_key = '..',
   __root_key = '...',
   __key_key = '<key>',
-  __interpolation_regex = r'{{([^{}]*)}}',
+  __interpolation_regex = r'({{([^{}]*)}})',
 
   # Remaining arguments will directly be stored in underlying dict
   users = {
@@ -35,9 +35,29 @@ ConfDict
 'john'
 >>> cd['users/john/ssh_private_key']
 '/home/john/.ssh/id_rsa'
+>>> cd['users/john']
+ConfDict
+{'ssh_private_key': '/home/john/.ssh/id_rsa', 'username': 'john'}
+>>> cd['users/jean']
+ConfDict
+{'ssh_private_key': '/home/jean/.ssh/id_rsa', 'username': 'jean'}
 >>> cd['users/jean'] = { 'username': 'jeans_custom_username' }
 >>> cd['users/jean/ssh_private_key']
 '/home/jeans_custom_username/.ssh/id_rsa'
+>>> # 'jean' exists now under 'users'
+>>> # there is no partial fallback so there is no 'ssh_private_key'
+>>> cd['users/jean']
+ConfDict
+{'username': 'jeans_custom_username'}
+>>> # we can realize fallback as jean to make concrete values
+>>> cd['users/fallback'].realize('jean')
+>>> cd['users/jean']
+ConfDict
+{'ssh_private_key': '/home/jeans_custom_username/.ssh/id_rsa', 'username': 'jeans_custom_username'}
+>>> # interpolation still works
+>>> cd['users/jean/username'] = 'jeans_custom_username2'
+>>> cd['users/jean/ssh_private_key']
+'/home/jeans_custom_username2/.ssh/id_rsa'
 ```
 
 

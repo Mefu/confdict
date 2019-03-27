@@ -259,7 +259,7 @@ class RecursiveDict(MutableMapping):
 
   def __unicode__(self):
     return str(self.__class__.__name__) + "\n" + pformat(
-      self.to_dict(True), indent=2, width=80, compact=False
+      self.to_dict(), indent=2, width=80, compact=False
     )
 
   def __repr__(self):
@@ -276,18 +276,24 @@ class RecursiveDict(MutableMapping):
       else:
         self[k] = v
 
-  def to_dict(self, store_only=False):
+  def to_dict(self):
     d = {}
     for key in self.store:
-      if store_only:
-        value = self.store[key]
-      else:
-        value = self[key]
+      value = self[key]
       if isinstance(value, RecursiveDict):
-        d[key] = value.to_dict(store_only)
+        d[key] = value.to_dict()
       else:
         d[key] = value
     return d
+
+  def copy(self):
+    return self.__class__(
+      __root=self.root,
+      __parent=self.parent,
+      __key=self.key,
+      __config=self.config,
+      **self.to_dict()
+    )
 
 
 class InterpolatedDict(RecursiveDict):
@@ -393,9 +399,15 @@ class ConfDict(InterpolatedDict):
     else:
       return super(ConfDict, self).value_after_get(key, value)
 
-  def realizeTo(self, key):
+  def realize(self, key):
     """
-    Call this to create an instance of current fallback with current key used
-    to access to fallback.
+    Realize values if and only if this is a fallback.
     """
-    self.root[key].update({self.key: self.to_dict()})
+    if self.key == 'fallback':
+      selfcopy = self.copy()
+      self.key = key
+      if key in self.parent:
+        selfcopy.update(self.parent[key].to_dict())
+        self.parent[key] = selfcopy.to_dict()
+      else:
+        self.parent.update({ key: self.to_dict() })
