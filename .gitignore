@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 
 # packaging stuff
+dist
 *.egg-info
 pip-wheel-metadata
 

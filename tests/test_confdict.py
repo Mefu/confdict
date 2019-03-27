@@ -98,7 +98,8 @@ def test_update():
     k1={
       'k11': 'v11',
       'k12': 'v12',
-    }, )
+    },
+  )
 
   cd.update({
     'k1': {
@@ -118,7 +119,8 @@ def test_contains():
       'k12': {
         'k121': 'v121',
       },
-    }, )
+    },
+  )
 
   assert 'k1' in cd
   assert 'k1/k12' in cd
@@ -185,7 +187,8 @@ def test_fallback_get():
         },
         'k113': 'v113',
       },
-    }, )
+    },
+  )
 
   assert cd['k1/k11/k111'] == 'v111'
   assert cd['k1/k11/k112/k1121'] == 'v1121'
@@ -232,7 +235,7 @@ def test_fallback_delete():
     },
   )
 
-  del cd['fallback/k13']
+  del cd['fallback']
   with pytest.raises(KeyError):
     cd['k1/k13']
 
@@ -283,7 +286,8 @@ def test_fallback_interpolation():
       'k11': {
         'k111': 'v111',
       },
-    }, )
+    },
+  )
   assert cd['k1/k12/k111'] == 'k12'
   assert cd['k1/k12/k112'] == 'k12'
   assert cd['k1/k12/k113'] == 'k12randomk12'
@@ -433,12 +437,15 @@ def test_to_str():
     },
   )
 
-  assert str(cd) == dedent('''
+  assert str(cd) == dedent(
+    '''
     ConfDict
     { 'fallback': { 'k11': {'k111': 'v111f'},
                     'k12': {'k121': '{{../k11/k111}}', 'k122': '{{k121}}'}},
       'k1': {'k11': {'k111': 'v111', 'k112': '{{k111}}'}}}
-  ''')[1:-1]  # remove first and last newline
+  '''
+  )[1:-1]  # remove first and last newline
+
 
 def test_realize():
   cd = ConfDict(
@@ -451,6 +458,9 @@ def test_realize():
         'k121': '{{../k11/k111}}',
         'k122': '{{k121}}',
       },
+    },
+    k2={
+      'k23': 'v23',
     },
   )
 
@@ -465,7 +475,31 @@ def test_realize():
     },
   }
 
-  cd['k1'].realize()
+  cd['k1'].realizeTo('.')
+  cd['k2/k11'].realizeTo('k2')
+  cd['k2/k12'].realizeTo('k2')
+
   del cd['fallback']
 
-  assert cd['k1/k11/k112'] == 'k1'
+  assert cd['k1'].to_dict() == {
+    'k11': {
+      'k111': 'v111f',
+      'k112': 'k1',
+    },
+    'k12': {
+      'k121': 'v111f',
+      'k122': 'v111f',
+    },
+  }
+
+  assert cd['k2'].to_dict() == {
+    'k11': {
+      'k111': 'v111f',
+      'k112': 'k2',
+    },
+    'k12': {
+      'k121': 'v111f',
+      'k122': 'v111f',
+    },
+    'k23': 'v23',
+  }

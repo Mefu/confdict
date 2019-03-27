@@ -113,7 +113,7 @@ class RecursiveDict(MutableMapping):
     """
     return path
 
-  def value_after_get(self, value):
+  def value_after_get(self, key, value):
     """
     Override this to modify value before returning.
     """
@@ -146,7 +146,7 @@ class RecursiveDict(MutableMapping):
         except KeyError as e:
           value = self.key_not_found(current_key, e)
 
-        value = self.value_after_get(value)
+        value = self.value_after_get(current_key, value)
         return value
     else:
       # recursion, best thing invented since sliced bread
@@ -176,11 +176,14 @@ class RecursiveDict(MutableMapping):
     """
     return path
 
-  def value_before_set(self, value):
+  def value_before_set(self, current_key, value):
     """
     Override this to modify value before set.
     """
     return value
+
+  def after_set(self):
+    pass
 
   def set(self, path, value):
     """
@@ -191,15 +194,17 @@ class RecursiveDict(MutableMapping):
       current_key = path[0]
       current_key = self.key_before_set(current_key)
       if isinstance(value, Mapping):
-        self.store[current_key] = self.__class__(
+        value = self.__class__(
           __root=self.root,
           __parent=self,
           __key=current_key,
           __config=self.config,
-          **value)
-      else:
-        value = self.value_before_set(value)
-        self.store[current_key] = value
+          **value
+        )
+
+      value = self.value_before_set(current_key, value)
+      self.store[current_key] = value
+      self.after_set()
     else:
       self.get(path[:1]).set(path[1:], value)
 
@@ -254,7 +259,8 @@ class RecursiveDict(MutableMapping):
 
   def __unicode__(self):
     return str(self.__class__.__name__) + "\n" + pformat(
-      self.to_dict(True), indent=2, width=80, compact=False)
+      self.to_dict(True), indent=2, width=80, compact=False
+    )
 
   def __repr__(self):
     return self.__unicode__()
@@ -294,18 +300,19 @@ class InterpolatedDict(RecursiveDict):
   def __init__(self, *args, **kwargs):
     kwargs['__config'] = kwargs.get('__config', {})
     kwargs['__config']['interpolation_regex'] = kwargs['__config'].get(
-      'interpolation_regex', r'({{([^{}]*)}})')
+      'interpolation_regex', r'({{([^{}]*)}})'
+    )
 
     super(InterpolatedDict, self).__init__(*args, **kwargs)
 
-  def value_after_get(self, value):
+  def value_after_get(self, key, value):
     """
     Tries to interpolate value if there is an instance matching.
     """
     if isinstance(value, str):
       return self.interpolate_value(value)
     else:
-      return super(InterpolatedDict, self).value_after_get(value)
+      return super(InterpolatedDict, self).value_after_get(key, value)
 
   def interpolate_value(self, value):
     rgx = re.compile(self.config['interpolation_regex'])
@@ -333,19 +340,24 @@ class ConfDict(InterpolatedDict):
   def __init__(self, *args, **kwargs):
     kwargs['__config'] = kwargs.get('__config', {})
     kwargs['__config']['fallback_key'] = kwargs['__config'].get(
-      'fallback_key', 'fallback')
-    kwargs['__config']['is_fallback'] = kwargs['__config'].get(
-      'is_fallback', False)
+      'fallback_key', 'fallback'
+    )
 
-    self.fallback = None
     super(ConfDict, self).__init__(*args, **kwargs)
 
+  @property
+  def has_fallback(self):
+    return self.config['fallback_key'] in self.store
+
+  @property
+  def fallback(self):
+    return self.store[self.config['fallback_key']]
+
   def key_not_found(self, key, error):
-    if key.startswith(self.config['fallback_key']) and self.fallback:
-      if self.config['separator'] in key:
-        self.fallback.key = key.split(self.config['separator'])[1]
-      else:
-        self.fallback.key = self.config['fallback_key']
+    if key.startswith(
+      self.config['fallback_key']
+    ) and self.config['separator'] in key and self.has_fallback:
+      self.fallback.key = key.split(self.config['separator'])[1]
       return self.fallback
 
     return super(ConfDict, self).key_not_found(key, error)
@@ -355,8 +367,9 @@ class ConfDict(InterpolatedDict):
 
     for idx in range(0, len(path)):
       fallback_path = copy(path)
-      fallback_path[idx] = self.config['separator'].join(
-        [self.config['fallback_key'], fallback_path[idx]])
+      fallback_path[idx] = self.config['separator'].join([
+        self.config['fallback_key'], fallback_path[idx]
+      ])
       fallback_paths.append(fallback_path)
 
     fallback_paths.reverse()
@@ -369,42 +382,20 @@ class ConfDict(InterpolatedDict):
 
     return super(ConfDict, self).path_not_found(path, error)
 
-  def value_after_get(self, value):
+  def value_after_get(self, key, value):
+    # in case fallbacks key was modified before by a fallback access
+    if key == self.config['fallback_key']:
+      value.key = self.config['fallback_key']
+
     # do not interpolate if accessed directly as fallback
-    if self.config['is_fallback'] and self.key == self.config['fallback_key']:
+    if self.config['fallback_key'] in self.full_path:
       return value
     else:
-      return super(ConfDict, self).value_after_get(value)
+      return super(ConfDict, self).value_after_get(key, value)
 
-  def update(self, d):
-    dcopy = copy(d)
-    if self.config['fallback_key'] in dcopy:
-      if self.fallback:
-        self.fallback.update(dcopy.pop(self.config['fallback_key']))
-      else:
-        self.fallback = ConfDict(
-          __root=self.root,
-          __parent=self,
-          __key=self.config['fallback_key'],
-          __is_fallback=True,
-          __config=self.config,
-          **dcopy.pop(self.config['fallback_key']))
-    super(ConfDict, self).update(dcopy)
-
-  def realize(self):
+  def realizeTo(self, key):
     """
     Call this to create an instance of current fallback with current key used
     to access to fallback.
     """
-    if self.config[
-        'is_fallback'] and not self.key == self.config['fallback_key']:
-      self.parent.update({
-        self.key: self.to_dict()
-      })
-
-  def to_dict(self, store_only=False):
-    d = super(ConfDict, self).to_dict(store_only)
-    if self.fallback:
-      self.fallback.key = self.config['fallback_key']
-      d[self.config['fallback_key']] = self.fallback.to_dict(True)
-    return d
+    self.root[key].update({self.key: self.to_dict()})
