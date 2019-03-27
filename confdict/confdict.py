@@ -410,4 +410,4 @@ class ConfDict(InterpolatedDict):
         selfcopy.update(self.parent[key].to_dict())
         self.parent[key] = selfcopy.to_dict()
       else:
-        self.parent.update({ key: self.to_dict() })
+        self.parent.update({key: self.to_dict()})

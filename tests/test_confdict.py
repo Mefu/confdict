@@ -20,7 +20,7 @@ def test_get():
     k3={
       'k31': 'v31',
       'k32': 'v32',
-    },
+    }
   )
 
   assert cd['k1'] == 'v1'
@@ -51,7 +51,7 @@ def test_set():
     k3={
       'k31': 'v31',
       'k32': 'v32',
-    },
+    }
   )
 
   cd['k1'] = 'v1_2'
@@ -79,7 +79,7 @@ def test_delete():
     k3={
       'k31': 'v31',
       'k32': 'v32',
-    },
+    }
   )
 
   del cd['k2/k22/k222']
@@ -94,12 +94,10 @@ def test_delete():
 
 
 def test_update():
-  cd = ConfDict(
-    k1={
-      'k11': 'v11',
-      'k12': 'v12',
-    },
-  )
+  cd = ConfDict(k1={
+    'k11': 'v11',
+    'k12': 'v12',
+  })
 
   cd.update({
     'k1': {
@@ -113,14 +111,12 @@ def test_update():
 
 
 def test_contains():
-  cd = ConfDict(
-    k1={
-      'k11': 'v11',
-      'k12': {
-        'k121': 'v121',
-      },
+  cd = ConfDict(k1={
+    'k11': 'v11',
+    'k12': {
+      'k121': 'v121',
     },
-  )
+  })
 
   assert 'k1' in cd
   assert 'k1/k12' in cd
@@ -142,7 +138,7 @@ def test_interpolation_get():
       },
       'k23': 'v23',
       'k24': '{{k22}}'
-    },
+    }
   )
 
   assert cd['k1/k11'] == 'v11'
@@ -155,14 +151,14 @@ def test_interpolation_get():
 
 
 def test_interpolation_set():
-  cd = ConfDict(k1={'k11': 'v11', 'k12': '{{k11}}'}, )
+  cd = ConfDict(k1={'k11': 'v11', 'k12': '{{k11}}'})
 
   cd['k1/k11'] = 'v11_2'
   assert cd['k1/k12'] == 'v11_2'
 
 
 def test_interpolation_delete():
-  cd = ConfDict(k1={'k11': 'v11', 'k12': '{{k11}}'}, )
+  cd = ConfDict(k1={'k11': 'v11', 'k12': '{{k11}}'})
 
   del cd['k1/k11']
   with pytest.raises(KeyError):
@@ -207,12 +203,10 @@ def test_fallback_get():
 
 
 def test_fallback_set():
-  cd = ConfDict(
-    k1={
-      'k11': 'v11',
-      'k12': 'v12',
-    },
-  )
+  cd = ConfDict(k1={
+    'k11': 'v11',
+    'k12': 'v12',
+  })
 
   cd['fallback'] = {
     'k13': 'v13f',
@@ -228,11 +222,10 @@ def test_fallback_delete():
   cd = ConfDict(
     fallback={
       'k13': 'v13f',
-    },
-    k1={
+    }, k1={
       'k11': 'v11',
       'k12': 'v12',
-    },
+    }
   )
 
   del cd['fallback']
@@ -244,11 +237,10 @@ def test_fallback_update():
   cd = ConfDict(
     fallback={
       'k13': 'v13f',
-    },
-    k1={
+    }, k1={
       'k11': 'v11',
       'k12': 'v12',
-    },
+    }
   )
 
   cd.update({
@@ -265,11 +257,10 @@ def test_fallback_contains():
   cd = ConfDict(
     fallback={
       'k13': 'v13f',
-    },
-    k1={
+    }, k1={
       'k11': 'v11',
       'k12': 'v12',
-    },
+    }
   )
   # fallbacks are not contained
   assert not 'k1/k13' in cd
@@ -286,7 +277,7 @@ def test_fallback_interpolation():
       'k11': {
         'k111': 'v111',
       },
-    },
+    }
   )
   assert cd['k1/k12/k111'] == 'k12'
   assert cd['k1/k12/k112'] == 'k12'
@@ -317,7 +308,7 @@ def test_to_dict():
         'k111': 'v111',
         'k112': '{{k111}}',
       },
-    },
+    }
   )
 
   assert cd.to_dict() == {
@@ -366,7 +357,7 @@ def test_custom_settings():
         'k112': '[[k111]]',
       },
     },
-    **test_config,
+    **test_config
   )
 
   assert cd['k1>k11>k111'] == 'v111'
@@ -387,16 +378,16 @@ def test_keys():
     k3={
       'k31': 'v31',
       'k32': 'v32',
-    },
+    }
   )
 
-  assert list(cd.keys()) == [
+  assert sorted(list(cd.keys())) == sorted([
     'k1',
     'k2/k21',
     'k2/k22/k221',
     'k3/k31',
     'k3/k32',
-  ]
+  ])
 
 
 def test_items():
@@ -411,16 +402,16 @@ def test_items():
     k3={
       'k31': 'v31',
       'k32': 'v32',
-    },
+    }
   )
 
-  assert list(cd.items()) == [
+  assert sorted(list(cd.items())) == sorted([
     ('k1', 'v1'),
     ('k2/k21', 'v21'),
     ('k2/k22/k221', 'v221'),
     ('k3/k31', 'v31'),
     ('k3/k32', 'v32'),
-  ]
+  ])
 
 
 def test_to_str():
@@ -439,7 +430,7 @@ def test_to_str():
         'k111': 'v111',
         'k112': '{{k111}}',
       },
-    },
+    }
   )
 
   assert str(cd) == dedent(
@@ -469,7 +460,7 @@ def test_realize():
         'k111': 'v111',
       },
       'k23': 'v23',
-    },
+    }
   )
 
   assert cd['k1'].to_dict() == {
