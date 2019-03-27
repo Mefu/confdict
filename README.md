@@ -1,19 +1,20 @@
 # ConfDict
 
-Configuration dictionary that extends built-in python dict with recursive access, fallback functionality and self references.
+Configuration dictionary that extends built-in python dict with recursive access, self references and fallback functionality. There is no extensive documentation yet, you can check out tests to figure out all features.
 
-Example usage of all of its extra features are as follows.
+## Example usage.
 
 ```python
 >>> from confdict import ConfDict
 >>> cd = ConfDict(
-  # Configuration of ConfDict, you can omit them if you are fine with these
+  # Configuration of ConfDict, these are default values
   __separator = '/',
   __self_key = '.',
   __parent_key = '..',
   __root_key = '...',
   __key_key = '<key>',
   __interpolation_regex = r'({{([^{}]*)}})',
+  __fallback_key = 'fallback',
 
   # Remaining arguments will directly be stored in underlying dict
   users = {
@@ -63,12 +64,12 @@ ConfDict
 
 ## Installation
 ```
-$ pip install
+$ pip install confdict
 ```
 
 ## Development
 
-This project includes a number of helpers in the `Makefile` to streamline common development tasks.
+There is a `Makefile` to automate commonly used development tasks.
 
 ### Environment Setup
 
@@ -77,11 +78,15 @@ This project includes a number of helpers in the `Makefile` to streamline common
 
 $ sudo pip install virtualenv # or your preferred way to install virtualenv
 
-$ make virtualenv
+$ make virtualenv # will also install dependencies
 
 $ source env/bin/activate
 
 ### run pytest / coverage
 
 $ make test
+
+### before commit
+
+$ make format
 ```
