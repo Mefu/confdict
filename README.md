@@ -1,5 +1,7 @@
 # ConfDict
 
+[![Build Status](https://travis-ci.org/Mefu/confdict.svg?branch=master)](https://travis-ci.org/Mefu/confdict)
+
 Configuration dictionary that extends built-in python dict with recursive access, self references and fallback functionality. There is no extensive documentation yet, you can check out tests to figure out all features.
 
 ## Example usage.
