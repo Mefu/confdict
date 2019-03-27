@@ -4,7 +4,7 @@ Configuration dictionary that extends built-in python dict with recursive access
 
 Example usage of all of its extra features are as follows.
 
-```
+```python
 >>> from confdict import ConfDict
 >>> cd = ConfDict(
   # Configuration of ConfDict, you can omit them if you are fine with these
