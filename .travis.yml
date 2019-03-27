@@ -1,7 +1,6 @@
 dist: xenial
 language: python
 python:
-- '2.7'
 - '3.4'
 - '3.5'
 - '3.6'
@@ -13,10 +12,3 @@ install:
 
 script:
 - make test
-
-# after_success:
-# - poetry publish -u mefu -p $PYPI_PASSWORD
-
-env:
-  global:
-    secure: guiyDV5D0DuGmKMT7nUnwxHqXKkwtYd5e896I1FT2cYfkHXCduY+qyniq9U0oxaVH8uECDcO49VhknSWHuSof8ug66jYpzGZoSy6EcYuCjpcmFKYHRPJkEJ9W6wUCWOemepvIdzExu0Ztnj18TlNcYAEO01LF6GAKklmc4YNbOwBYfamJaeErgmb92dEKnUdVXoMGKRWMwXF6b0VxkEI0v3+TQkKKEJGNYYBZCf/nlQ1sEGL1IpaXHMossm7Bwudyg3hXnepfCgtyIdP4zD5WTIOwq6RuK6lkPKjr65I7mFD1eXuPtAr0laR+I/8d/u6TRUr3YpYnaA7QTKCjz3Jrc3VWzDuSDEAvg2BuyzjcWoBu8CMuHPiXIXvFcTpF2E1TvhKapYD7DaKRj48JgF8YdnD6xhKc8wC5+44/vGvfI4+VC2hk/AMq2ntMGrw3R81BbwP0hZSrsgCgiQ1p06DVFxUsnh+5xSb8cat0aB/aMx0WbipChs5f+GNqgkJBwMij6lSbWE52Zg6YaVY24RKlSJvutbARa78FvnypOVarT6txROEKae2Zf4K2s5H2Cf10pfz08kdEN0fqjr+lN3slYWwFwfT6PDJPyJF1OkT7H/qXTbpGAzCRiuwSot+ukoYR6cfPo/tH/fOalaVg3cDzFfMyGoQAKKzoPI+UV8LyYI=
