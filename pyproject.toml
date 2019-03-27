@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "confdict"
-version = "0.1.0"
+version = "0.0.1"
 description = "A dictionary with nested access, interpolation and fallback features. It is primarily meant to be used for storing configurations of programs."
 authors = [
   "Mehmet Can Ozdemir <mefu.ozd@gmail.com>"
